@@ -2,5 +2,6 @@
 resolver = "2"
 members = [
     "memchrn-macro",
-    "memchr-n"
+    "memchr-n",
+    "fuzz"
 ]

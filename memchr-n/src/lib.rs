@@ -13,7 +13,7 @@ pub trait MemchrNMatch {
 
 pub trait MemchrN {
     fn first(&self, haystack: &[u8]) -> Option<usize>;
-    fn iter<'h>(&self, haystack: &'h [u8]) -> impl Iterator<Item = usize>;
+    fn iter(&self, haystack: &[u8]) -> impl Iterator<Item = usize>;
 }
 
 pub enum MemchrNImpl {
@@ -45,7 +45,7 @@ impl MemchrN for MemchrNImpl {
         }
     }
 
-    fn iter<'h>(&self, haystack: &'h [u8]) -> impl Iterator<Item = usize> {
+    fn iter(&self, haystack: &[u8]) -> impl Iterator<Item = usize> {
         match self {
             MemchrNImpl::One(s1) => MemchrNIter::Memchr1(Memchr::new(*s1, haystack)),
             MemchrNImpl::Two(s1, s2) => MemchrNIter::Memchr2(Memchr2::new(*s1, *s2, haystack)),
@@ -88,13 +88,50 @@ impl<'h> Iterator for MemchrNIter<'h> {
 mod tests {
     use super::*;
 
-    lazy_static::lazy_static! {
-        static ref WsMatcher: MemchrNImpl = MemchrNImpl::new(b"\t\r\n");
+    #[test]
+    fn test_one_needle() {
+        let m = MemchrNImpl::new(b"a");
+        assert_eq!(m.first(b"bcdef"), None);
+        assert_eq!(m.first(b"bcaef"), Some(2));
     }
 
     #[test]
-    fn test_match_16b_none() {
-        let chunk = *b"abcdefghijklmnop";
-        assert_eq!(WsMatcher.first(&chunk), Some(0));
+    fn test_two_needles() {
+        let m = MemchrNImpl::new(b"ax");
+        assert_eq!(m.first(b"bcdef"), None);
+        assert_eq!(m.first(b"bcaef"), Some(2));
+        assert_eq!(m.first(b"bcxef"), Some(2));
+    }
+
+    #[test]
+    fn test_three_needles() {
+        let m = MemchrNImpl::new(b"axy");
+        assert_eq!(m.first(b"bcdef"), None);
+        assert_eq!(m.first(b"bcaef"), Some(2));
+        assert_eq!(m.first(b"ycaef"), Some(0));
+    }
+
+    #[test]
+    fn test_shufti_fallback_needles() {
+        let m = MemchrNImpl::new(b"\t\r\n "); // 4 needles
+        assert_eq!(m.first(b"abcdefghijklmnop"), None); // 16 bytes
+        assert_eq!(m.first(b"abcde\nghijklmnop"), Some(5)); // in middle
+        assert_eq!(m.first(b"\rabcdefghijklmno"), Some(0)); // at start
+        assert_eq!(m.first(b"abcdefghijklmno "), Some(15)); // at end
+        assert_eq!(m.first(b"hello world"), Some(5)); // short
+        assert_eq!(m.first(b"hello\n world"), Some(5)); // two matches, finds first
+    }
+
+    #[test]
+    fn test_iterators() {
+        let text = b"a b c d\te\nf  g";
+
+        let m_one = MemchrNImpl::new(b" ");
+        let offsets1: Vec<_> = m_one.iter(text).collect();
+        assert_eq!(offsets1, vec![1, 3, 5, 11, 12]);
+
+        let m_four = MemchrNImpl::new(b" \t\n\r");
+        let offsets4: Vec<_> = m_four.iter(text).collect();
+        assert_eq!(offsets4, vec![1, 3, 5, 7, 9, 11, 12]);
     }
 }

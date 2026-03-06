@@ -2,6 +2,8 @@ use core::arch::aarch64::*;
 use crate::arch::Vector;
 
 impl Vector for uint8x16_t {
+    type BitMask = u16;
+
     #[inline(always)]
     unsafe fn load(ptr: *const u8) -> Self {
         vld1q_u8(ptr)

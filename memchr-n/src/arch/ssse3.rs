@@ -1,8 +1,11 @@
-use crate::arch::Vector;
 use core::arch::x86_64::*;
+
+use crate::arch::Vector;
 
 #[allow(warnings)]
 impl Vector for __m128i {
+    type BitMask = u16;
+
     #[inline(always)]
     unsafe fn load(ptr: *const u8) -> Self {
         _mm_loadu_si128(ptr as *const __m128i)
@@ -39,33 +42,7 @@ impl Vector for __m128i {
     }
 
     #[inline(always)]
-    unsafe fn movmask(self) -> u16 {
+    unsafe fn movmask(self) -> Self::BitMask {
         _mm_movemask_epi8(self) as u16
-    }
-}
-
-#[inline(always)]
-pub unsafe fn bitmask_16b(
-    low_tab: &[u8; 16],
-    high_tab: &[u8; 16],
-    bit_mask: u8,
-    data: &[u8; 16],
-) -> u16 {
-    unsafe {
-        let l_tab = __m128i::load(low_tab.as_ptr());
-        let h_tab = __m128i::load(high_tab.as_ptr());
-        let input = __m128i::load(data.as_ptr());
-
-        let nib_mask = __m128i::splat(0x0f_u8);
-        let lo = input.and(nib_mask);
-        let hi = input.shr_4().and(nib_mask);
-
-        let lo_sf = l_tab.shuffle(lo);
-        let hi_sf = h_tab.shuffle(hi);
-        let v = lo_sf.and(hi_sf);
-
-        let bm = __m128i::splat(bit_mask);
-        let masked = v.and(bm);
-        masked.cmpne(__m128i::splat(0)).movmask()
     }
 }

@@ -1,0 +1,20 @@
+[package]
+name = "memchrn-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+memchrn-macro = { path = "../memchrn-macro" } 
+memchr-n ={ path = "../memchr-n" }
+
+[[bin]]
+name = "memchr_n"
+path = "fuzz_targets/memchr_n.rs"
+test = false
+doc = false
+bench = false

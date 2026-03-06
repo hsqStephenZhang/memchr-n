@@ -9,7 +9,6 @@ pub struct MemchrNTable {
 }
 
 impl MemchrNTable {
-    // Panics:
     pub fn new(needles: &[u8]) -> Self {
         // TODO: needles must be unique
         let mut low_tab = [0u8; 16];
@@ -22,6 +21,7 @@ impl MemchrNTable {
         Self { low_tab, high_tab, bit_mask: (1u32 << needles.len()).wrapping_sub(1) as u8 }
     }
 
+    /// # Safety: the low_tab and high_tab and bit_mask must be valid
     pub unsafe fn new_raw(low_tab: [u8; 16], high_tab: [u8; 16], bit_mask: u8) -> Self {
         Self { low_tab, high_tab, bit_mask }
     }
