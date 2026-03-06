@@ -1,5 +1,5 @@
 use shufti_macro::ShuftiMatcher;
-use shufti_matcher::ShuftiMatch;
+use memchr_n::ShuftiMatch;
 
 #[derive(ShuftiMatcher)]
 #[shufti(set = "\t\r\n")]

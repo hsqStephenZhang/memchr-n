@@ -10,7 +10,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use shufti_matcher::{ShuftiMatcher};
+//! use memchr_n::{ShuftiMatcher};
 //! use shufti_macro::ShuftiMatcher;
 //!
 //! #[derive(ShuftiMatcher)]

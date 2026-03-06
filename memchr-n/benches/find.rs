@@ -10,7 +10,7 @@
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use memchr::{memchr, memchr2, memchr3};
-use shufti_matcher::ShuftiTable;
+use memchr_n::ShuftiTable;
 use std::hint::black_box;
 
 // ---------------------------------------------------------------------------

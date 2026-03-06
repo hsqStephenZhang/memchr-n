@@ -22,7 +22,7 @@ shufti-matcher = { git = "..." }
 ```
 
 ```rust
-use shufti_matcher::ShuftiMatcher;
+use memchr_n::ShuftiMatcher;
 
 /// Matches whitespace characters – tables computed at compile time.
 #[derive(ShuftiMatcher)]
@@ -105,12 +105,12 @@ pub struct WhitespaceMatcher;
 The macro emits (simplified):
 
 ```rust
-impl ::shufti_matcher::ShuftiMatcher for WhitespaceMatcher {
+impl ::memchr_n::ShuftiMatcher for WhitespaceMatcher {
     const SET: &'static str = "\t\r\n";
     const NEEDLE_COUNT: usize = 3;
 
-    fn table() -> ::shufti_matcher::ShuftiTable {
-        ::shufti_matcher::ShuftiTable {
+    fn table() -> ::memchr_n::ShuftiTable {
+        ::memchr_n::ShuftiTable {
             low_tab:  [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 3u8, 2u8, 0u8, 0u8, 4u8, 0u8, 0u8],
             high_tab: [4u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8],
             bit_mask: 7u8,

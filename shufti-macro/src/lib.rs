@@ -13,15 +13,15 @@ use syn::{DeriveInput, Lit, parse_macro_input};
 /// pub struct BracketMatcher;
 /// ```
 #[proc_macro_derive(ShuftiMatcher, attributes(shufti))]
-pub fn derive_shufti_matcher(input: TokenStream) -> TokenStream {
+pub fn derive_memchr_n(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    match impl_shufti_matcher(&input) {
+    match impl_memchr_n(&input) {
         Ok(ts) => ts.into(),
         Err(e) => e.to_compile_error().into(),
     }
 }
 
-fn impl_shufti_matcher(input: &DeriveInput) -> syn::Result<TokenStream2> {
+fn impl_memchr_n(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let name = &input.ident;
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -70,13 +70,13 @@ fn impl_shufti_matcher(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let set_repr = set_str.clone();
 
     Ok(quote! {
-        impl #impl_generics ::shufti_matcher::ShuftiMatch for #name #ty_generics #where_clause {
+        impl #impl_generics ::memchr_n::ShuftiMatch for #name #ty_generics #where_clause {
             const SET: &'static str = #set_repr;
             const NEEDLE_COUNT: usize = #needle_len;
 
             #[inline(always)]
-            fn table() -> ::shufti_matcher::ShuftiTable {
-                ::shufti_matcher::ShuftiTable {
+            fn table() -> ::memchr_n::ShuftiTable {
+                ::memchr_n::ShuftiTable {
                     low_tab:  [#(#low_tab_tokens),*],
                     high_tab: [#(#high_tab_tokens),*],
                     bit_mask: #bit_mask,
@@ -221,10 +221,10 @@ mod tests {
         })
         .unwrap();
 
-        let ts = impl_shufti_matcher(&input).unwrap();
+        let ts = impl_memchr_n(&input).unwrap();
         assert_eq!(
             ts.to_string(),
-            r#"impl :: shufti_matcher :: ShuftiMatch for MyMatcher { const SET : & 'static str = "abc" ; const NEEDLE_COUNT : usize = 3usize ; # [inline (always)] fn table () -> :: shufti_matcher :: ShuftiTable { :: shufti_matcher :: ShuftiTable { low_tab : [0u8 , 1u8 , 2u8 , 4u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , high_tab : [0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 7u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , bit_mask : 7u8 , } } }"#
+            r#"impl :: memchr_n :: ShuftiMatch for MyMatcher { const SET : & 'static str = "abc" ; const NEEDLE_COUNT : usize = 3usize ; # [inline (always)] fn table () -> :: memchr_n :: ShuftiTable { :: memchr_n :: ShuftiTable { low_tab : [0u8 , 1u8 , 2u8 , 4u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , high_tab : [0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 7u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , bit_mask : 7u8 , } } }"#
         );
     }
 }
