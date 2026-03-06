@@ -24,12 +24,20 @@ pub enum MemchrNImpl {
 }
 
 impl MemchrNImpl {
+    /// # Panics
+    ///
+    /// This Function panics if |needles|>3 and the needles contains duplicated character
     pub fn new(needles: &[u8]) -> Self {
+        Self::try_new(needles).unwrap()
+    }
+
+    #[inline(always)]
+    pub fn try_new(needles: &[u8]) -> Result<Self, &str> {
         match needles.len() {
-            1 => MemchrNImpl::One(needles[0]),
-            2 => MemchrNImpl::Two(needles[0], needles[1]),
-            3 => MemchrNImpl::Three(needles[0], needles[1], needles[2]),
-            _ => MemchrNImpl::MemchrN(MemchrNTable::new(needles)),
+            1 => Ok(MemchrNImpl::One(needles[0])),
+            2 => Ok(MemchrNImpl::Two(needles[0], needles[1])),
+            3 => Ok(MemchrNImpl::Three(needles[0], needles[1], needles[2])),
+            _ => MemchrNTable::try_new(needles).map(MemchrNImpl::MemchrN),
         }
     }
 }
@@ -80,13 +88,17 @@ impl<'h> Iterator for MemchrNIter<'h> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fallback_iter(needles: &[u8], haystack: &[u8]) -> impl Iterator<Item = usize> {
+        haystack.iter().enumerate().filter_map(
+            |(idx, ch)| {
+                if needles.contains(ch) { Some(idx) } else { None }
+            },
+        )
+    }
 
     #[test]
     fn test_one_needle() {
@@ -133,5 +145,54 @@ mod tests {
         let m_four = MemchrNImpl::new(b" \t\n\r");
         let offsets4: Vec<_> = m_four.iter(text).collect();
         assert_eq!(offsets4, vec![1, 3, 5, 7, 9, 11, 12]);
+    }
+
+    #[test]
+    fn test_empty_haystack() {
+        let m_one = MemchrNImpl::new(b"a");
+        assert_eq!(m_one.first(b""), None);
+        assert_eq!(m_one.iter(b"").collect::<Vec<_>>(), vec![]);
+
+        let m_four = MemchrNImpl::new(b"abcd");
+        assert_eq!(m_four.first(b""), None);
+        assert_eq!(m_four.iter(b"").collect::<Vec<_>>(), vec![]);
+    }
+
+    #[test]
+    fn test_all_matches() {
+        let m_all = MemchrNImpl::new(b"ab");
+        let offsets: Vec<_> = m_all.iter(b"abcba").collect();
+        assert_eq!(offsets, vec![0, 1, 3, 4]);
+    }
+
+    #[test]
+    fn test_many_needles() {
+        let haystack = b"the quick brown fox jumps over the lazy dog";
+        let needles = b"aeiou";
+        let m = MemchrNImpl::new(needles);
+        let vowels: Vec<_> = m.iter(haystack).collect();
+        assert_eq!(vowels, fallback_iter(needles, haystack).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_repeated_needles_fallback_to_memchr() {
+        let m = MemchrNImpl::new(b"aa");
+        let offsets: Vec<_> = m.iter(b"abac").collect();
+        assert_eq!(offsets, vec![0, 2]);
+    }
+
+    #[should_panic(expected = "needles must be unique")]
+    #[test]
+    fn test_repeated_needles_panic() {
+        let m = MemchrNImpl::new(b"aaaaa");
+        let offsets: Vec<_> = m.iter(b"abac").collect();
+        assert_eq!(offsets, vec![0, 2]);
+    }
+
+    #[test]
+    fn test_first_multiple_matches() {
+        let m = MemchrNImpl::new(b"xyz");
+        assert_eq!(m.first(b"abczxy"), Some(3));
+        assert_eq!(m.first(b"yzx"), Some(0));
     }
 }
