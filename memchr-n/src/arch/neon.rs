@@ -1,4 +1,5 @@
 use core::arch::aarch64::*;
+
 use crate::arch::Vector;
 
 impl Vector for uint8x16_t {
@@ -55,7 +56,12 @@ impl Vector for uint8x16_t {
     }
 }
 
-pub unsafe fn bitmask_16b(low_tab: &[u8; 16], high_tab: &[u8; 16], bit_mask: u8, data: &[u8; 16]) -> u16 {
+pub unsafe fn bitmask_16b(
+    low_tab: &[u8; 16],
+    high_tab: &[u8; 16],
+    bit_mask: u8,
+    data: &[u8; 16],
+) -> u16 {
     unsafe {
         let l_tab = uint8x16_t::load(low_tab.as_ptr());
         let h_tab = uint8x16_t::load(high_tab.as_ptr());
