@@ -7,13 +7,15 @@ description = "shufti table based string matcher"
 
 [dependencies]
 cfg-if = "1.0.4"
-shufti-macro = { path = "../shufti-macro", version = "0.1.0" }
+memchrn-macro = { path = "../memchrn-macro", version = "0.1.0" }
+memchr = "2.8.0"
 
 [dev-dependencies]
 rand = "0.10.0"
 criterion = { version = "0.8", features = ["html_reports"] }
 memchr = "2.8.0"
 aho-corasick = "1.1.4"
+lazy_static = "1.0"
 
 [[bench]]
 harness = false

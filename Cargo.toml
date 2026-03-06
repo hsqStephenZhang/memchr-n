@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "shufti-macro",
+    "memchrn-macro",
     "memchr-n"
 ]

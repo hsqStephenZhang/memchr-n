@@ -3,16 +3,16 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{DeriveInput, Lit, parse_macro_input};
 
-/// Derive macro that reads `#[shufti(set = "...")]` on a struct and implements
-/// `ShuftiMatcher` for it with tables computed at compile time.
+/// Derive macro that reads `#[memchrn(set = "...")]` on a struct and implements
+/// `MemchrNMatcher` for it with tables computed at compile time.
 ///
 /// # Example
 /// ```rust,ignore
-/// #[derive(ShuftiMatcher)]
-/// #[shufti(set = "[]{}<>()")]
+/// #[derive(MemchrNMatcher)]
+/// #[memchrn(set = "[]{}<>()")]
 /// pub struct BracketMatcher;
 /// ```
-#[proc_macro_derive(ShuftiMatcher, attributes(shufti))]
+#[proc_macro_derive(MemchrNMatcher, attributes(memchrn))]
 pub fn derive_memchr_n(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match impl_memchr_n(&input) {
@@ -26,15 +26,47 @@ fn impl_memchr_n(input: &DeriveInput) -> syn::Result<TokenStream2> {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    // Parse #[shufti(set = "...")] attribute
+    // Parse #[memchrn(set = "...")] attribute
     let set_str = extract_set_attr(&input.attrs)?;
     let needles: Vec<u8> = set_str.bytes().collect();
 
     if needles.is_empty() {
-        return Err(syn::Error::new_spanned(
-            &input.ident,
-            "shufti set must have >=1 bytes",
-        ));
+        return Err(syn::Error::new_spanned(&input.ident, "shufti set must have >=1 bytes"));
+    }
+
+    if needles.len() == 1 {
+        let s1 = needles[0];
+        return Ok(quote! {
+            impl #impl_generics ::memchr_n::MemchrNMatch for #name #ty_generics #where_clause {
+                #[inline(always)]
+                fn memchr_n() -> impl ::memchr_n::MemchrN {
+                    ::memchr_n::MemchrNImpl::One(#s1)
+                }
+            }
+        });
+    } else if needles.len() == 2 {
+        let s1 = needles[0];
+        let s2 = needles[1];
+        return Ok(quote! {
+            impl #impl_generics ::memchr_n::MemchrNMatch for #name #ty_generics #where_clause {
+                #[inline(always)]
+                fn memchr_n() -> impl ::memchr_n::MemchrN {
+                    ::memchr_n::MemchrNImpl::Two(#s1, #s2)
+                }
+            }
+        });
+    } else if needles.len() == 3 {
+        let s1 = needles[0];
+        let s2 = needles[1];
+        let s3 = needles[2];
+        return Ok(quote! {
+            impl #impl_generics ::memchr_n::MemchrNMatch for #name #ty_generics #where_clause {
+                #[inline(always)]
+                fn memchr_n() -> impl ::memchr_n::MemchrN {
+                    ::memchr_n::MemchrNImpl::Three(#s1, #s2, #s3)
+                }
+            }
+        });
     }
 
     // Check uniqueness
@@ -57,30 +89,21 @@ fn impl_memchr_n(input: &DeriveInput) -> syn::Result<TokenStream2> {
     };
 
     let Some((low_tab, high_tab, bit_mask)) = res else {
-        return Err(syn::Error::new_spanned(
-            &input.ident,
-            format!("failed to build shufti table"),
-        ));
+        return Err(syn::Error::new_spanned(&input.ident, format!("failed to build shufti table")));
     };
 
     let low_tab_tokens = low_tab.iter().map(|b| quote! { #b});
     let high_tab_tokens = high_tab.iter().map(|b| quote! { #b});
 
-    let needle_len = needles.len();
-    let set_repr = set_str.clone();
-
     Ok(quote! {
-        impl #impl_generics ::memchr_n::ShuftiMatch for #name #ty_generics #where_clause {
-            const SET: &'static str = #set_repr;
-            const NEEDLE_COUNT: usize = #needle_len;
-
+        impl #impl_generics ::memchr_n::MemchrNMatch for #name #ty_generics #where_clause {
             #[inline(always)]
-            fn table() -> ::memchr_n::ShuftiTable {
-                ::memchr_n::ShuftiTable {
-                    low_tab:  [#(#low_tab_tokens),*],
-                    high_tab: [#(#high_tab_tokens),*],
-                    bit_mask: #bit_mask,
-                }
+            fn memchr_n() -> impl ::memchr_n::MemchrN {
+                ::memchr_n::MemchrNImpl::MemchrN( unsafe {
+                    ::memchr_n::MemchrNTable::new_raw([#(#low_tab_tokens),*],
+                    [#(#high_tab_tokens),*],
+                    #bit_mask,)
+                })
             }
         }
     })
@@ -92,7 +115,7 @@ fn impl_memchr_n(input: &DeriveInput) -> syn::Result<TokenStream2> {
 
 fn extract_set_attr(attrs: &[syn::Attribute]) -> syn::Result<String> {
     for attr in attrs {
-        if !attr.path().is_ident("shufti") {
+        if !attr.path().is_ident("memchrn") {
             continue;
         }
 
@@ -118,7 +141,7 @@ fn extract_set_attr(attrs: &[syn::Attribute]) -> syn::Result<String> {
     }
     Err(syn::Error::new(
         proc_macro2::Span::call_site(),
-        "missing #[shufti(set = \"...\")] attribute",
+        "missing #[memchrn(set = \"...\")] attribute",
     ))
 }
 
@@ -215,8 +238,8 @@ mod tests {
     #[test]
     fn test() {
         let input = syn::parse2(quote! {
-            #[derive(ShuftiMatcher)]
-            #[shufti(set = "abc")]
+            #[derive(MemchrNMatcher)]
+            #[memchrn(set = "abcd")]
             pub struct MyMatcher;
         })
         .unwrap();
@@ -224,7 +247,7 @@ mod tests {
         let ts = impl_memchr_n(&input).unwrap();
         assert_eq!(
             ts.to_string(),
-            r#"impl :: memchr_n :: ShuftiMatch for MyMatcher { const SET : & 'static str = "abc" ; const NEEDLE_COUNT : usize = 3usize ; # [inline (always)] fn table () -> :: memchr_n :: ShuftiTable { :: memchr_n :: ShuftiTable { low_tab : [0u8 , 1u8 , 2u8 , 4u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , high_tab : [0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 7u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , bit_mask : 7u8 , } } }"#
+            r#"impl :: memchr_n :: MemchrNMatch for MyMatcher { # [inline (always)] fn memchr_n () -> impl :: memchr_n :: MemchrN { :: memchr_n :: MemchrNImpl :: MemchrN (unsafe { :: memchr_n :: MemchrNTable :: new_raw ([0u8 , 1u8 , 2u8 , 4u8 , 8u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , [0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 15u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , 15u8 ,) }) } }"#
         );
     }
 }
