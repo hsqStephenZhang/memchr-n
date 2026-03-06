@@ -2,6 +2,7 @@ use core::arch::aarch64::*;
 
 use crate::arch::Vector;
 
+#[allow(warnings)]
 impl Vector for uint8x16_t {
     type BitMask = u16;
 
@@ -53,33 +54,5 @@ impl Vector for uint8x16_t {
         let mask64: u64 = vgetq_lane_u64(res16, 0) | (vgetq_lane_u64(res16, 1) << 8);
 
         mask64 as u16
-    }
-}
-
-pub unsafe fn bitmask_16b(
-    low_tab: &[u8; 16],
-    high_tab: &[u8; 16],
-    bit_mask: u8,
-    data: &[u8; 16],
-) -> u16 {
-    unsafe {
-        let l_tab = uint8x16_t::load(low_tab.as_ptr());
-        let h_tab = uint8x16_t::load(high_tab.as_ptr());
-        let input = uint8x16_t::load(data.as_ptr());
-
-        let low_mask = uint8x16_t::splat(0x0f);
-        let lo = input.and(low_mask);
-        let hi = input.shr_4();
-
-        let lo_sf = l_tab.shuffle(lo);
-        let hi_sf = h_tab.shuffle(hi);
-        let v = lo_sf.and(hi_sf);
-
-        // vtstq_u8: sets byte to 0xFF if (v & bit_mask) != 0
-        // this is equivalent to cmpeq against zero, then bitwise NOT, but we was directly using vtstq_u8
-        // However, we are asked to use cmpeq and movmask methods.
-        // wait, we can just use `vceqq_u8(vandq_u8(v, vmovq_n_u8(bit_mask)), vdupq_n_u8(0))` then `vmvnq_u8`
-        let masked = v.and(uint8x16_t::splat(bit_mask));
-        masked.cmpne(uint8x16_t::splat(0)).movmask()
     }
 }

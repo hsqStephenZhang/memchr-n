@@ -52,7 +52,7 @@ cfg_if::cfg_if! {
             bit_mask: u8,
             data: &[u8; 16],
         ) -> u16 {
-            unsafe { generic::bitmask_16b::<core::arch::neon::uint8x16_t>(low_tab, high_tab, bit_mask, data)}
+            unsafe { generic::bitmask_16b::<core::arch::aarch64::uint8x16_t>(low_tab, high_tab, bit_mask, data)}
         }
     } else {
        #[inline(always)]
