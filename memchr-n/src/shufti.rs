@@ -10,14 +10,19 @@ pub struct MemchrNTable {
 
 impl MemchrNTable {
     pub fn new(needles: &[u8]) -> Self {
-        // TODO: needles must be unique
+        assert!(needles.len() <= 8, "too many needles");
+
         let mut low_tab = [0u8; 16];
         let mut high_tab = [0u8; 16];
+
         for (i, &b) in needles.iter().enumerate() {
+            assert!(!needles[..i].contains(&b), "needles must be unique");
+
             let bit = 1u8 << i;
             low_tab[(b & 0x0f) as usize] |= bit;
             high_tab[(b >> 4) as usize] |= bit;
         }
+
         Self { low_tab, high_tab, bit_mask: (1u32 << needles.len()).wrapping_sub(1) as u8 }
     }
 
