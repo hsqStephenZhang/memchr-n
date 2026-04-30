@@ -55,20 +55,76 @@ impl MemchrNTable {
 
     /// Search `haystack` for the first byte that belongs to the set.
     ///
-    /// Processes the input in 16-byte chunks using [`match_16b`](Self::match_16b),
-    /// then handles the remaining epilogue byte-by-byte with a scalar fallback.
+    /// Processes the input in 64-byte chunks using unrolled SIMD path,
+    /// then handles the remaining bytes in 16-byte chunks and finally scalar fallback.
     pub fn first(&self, haystack: &[u8]) -> Option<usize> {
         let mut offset = 0usize;
 
-        // --- 16-byte fast path ---
-        while offset + 16 <= haystack.len() {
-            // SAFETY: we've checked there are ≥16 bytes available.
-            let chunk: &[u8; 16] = unsafe { &*(haystack.as_ptr().add(offset) as *const [u8; 16]) };
-            let mask = self.bitmask_16b(chunk) as u32;
-            if mask != 0 {
-                return Some(offset + mask.trailing_zeros() as usize);
+        unsafe {
+            use crate::arch::Vector;
+            let l_tab = crate::arch::Vector::load(self.low_tab.as_ptr());
+            let h_tab = crate::arch::Vector::load(self.high_tab.as_ptr());
+            let bm = crate::arch::Vector::splat(self.bit_mask);
+
+            // --- 64-byte unrolled loop ---
+            while offset + 64 <= haystack.len() {
+                let ptr = haystack.as_ptr().add(offset);
+                let v0 = crate::arch::Vector::load(ptr);
+                let v1 = crate::arch::Vector::load(ptr.add(16));
+                let v2 = crate::arch::Vector::load(ptr.add(32));
+                let v3 = crate::arch::Vector::load(ptr.add(48));
+
+                let res0 = crate::arch::shufti_match_16b(&l_tab, &h_tab, &bm, &v0);
+                let res1 = crate::arch::shufti_match_16b(&l_tab, &h_tab, &bm, &v1);
+                let res2 = crate::arch::shufti_match_16b(&l_tab, &h_tab, &bm, &v2);
+                let res3 = crate::arch::shufti_match_16b(&l_tab, &h_tab, &bm, &v3);
+
+                let acc = res0.or(res1).or(res2.or(res3));
+                if acc.any_match() {
+                    // Match recovery
+                    if res0.or(res1).any_match() {
+                        if res0.any_match() {
+                            return Some(
+                                offset
+                                    + (res0.cmpne(crate::arch::Vector::splat(0)).movmask() as u32)
+                                        .trailing_zeros() as usize,
+                            );
+                        }
+                        return Some(
+                            offset
+                                + 16
+                                + (res1.cmpne(crate::arch::Vector::splat(0)).movmask() as u32)
+                                    .trailing_zeros() as usize,
+                        );
+                    } else {
+                        if res2.any_match() {
+                            return Some(
+                                offset
+                                    + 32
+                                    + (res2.cmpne(crate::arch::Vector::splat(0)).movmask() as u32)
+                                        .trailing_zeros() as usize,
+                            );
+                        }
+                        return Some(
+                            offset
+                                + 48
+                                + (res3.cmpne(crate::arch::Vector::splat(0)).movmask() as u32)
+                                    .trailing_zeros() as usize,
+                        );
+                    }
+                }
+                offset += 64;
             }
-            offset += 16;
+
+            // --- 16-byte loop ---
+            while offset + 16 <= haystack.len() {
+                let chunk: &[u8; 16] = &*(haystack.as_ptr().add(offset) as *const [u8; 16]);
+                let mask = self.bitmask_16b(chunk) as u32;
+                if mask != 0 {
+                    return Some(offset + mask.trailing_zeros() as usize);
+                }
+                offset += 16;
+            }
         }
 
         // --- Scalar epilogue ---
