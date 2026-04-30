@@ -22,6 +22,11 @@ impl Vector for uint8x16_t {
     }
 
     #[inline(always)]
+    unsafe fn or(self, other: Self) -> Self {
+        vorrq_u8(self, other)
+    }
+
+    #[inline(always)]
     unsafe fn shr_4(self) -> Self {
         vshrq_n_u8(self, 4)
     }
@@ -39,6 +44,11 @@ impl Vector for uint8x16_t {
     #[inline(always)]
     unsafe fn cmpne(self, other: Self) -> Self {
         vmvnq_u8(self.cmpeq(other))
+    }
+
+    #[inline(always)]
+    unsafe fn any_match(self) -> bool {
+        vmaxvq_u8(self) != 0
     }
 
     #[inline(always)]

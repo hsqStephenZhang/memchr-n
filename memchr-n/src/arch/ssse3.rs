@@ -22,6 +22,11 @@ impl Vector for __m128i {
     }
 
     #[inline(always)]
+    unsafe fn or(self, other: Self) -> Self {
+        _mm_or_si128(self, other)
+    }
+
+    #[inline(always)]
     unsafe fn shr_4(self) -> Self {
         _mm_srli_epi16(self, 4)
     }
@@ -44,5 +49,10 @@ impl Vector for __m128i {
     #[inline(always)]
     unsafe fn movmask(self) -> Self::BitMask {
         _mm_movemask_epi8(self) as u16
+    }
+
+    #[inline(always)]
+    unsafe fn any_match(self) -> bool {
+        self.movmask() != 0
     }
 }
