@@ -87,7 +87,7 @@ fn naive_search(needles: &[u8], haystack: &[u8]) -> Option<usize> {
 
 /// memchr-based search: use the best memchr API for the needle count.
 /// For |N| > 3 we fall back to memchr3 over each needle byte (OR of results).
-#[inline(never)]
+#[inline(always)]
 fn memchr_search(needles: &[u8], haystack: &[u8]) -> Option<usize> {
     match needles.len() {
         1 => memchr(needles[0], haystack),
