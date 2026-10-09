@@ -135,6 +135,41 @@ mod tests {
     }
 
     #[test]
+    fn test_shufti_unrolled_loop_each_needle() {
+        for needles in [b"abcd".as_slice(), b"abcdefgh".as_slice()] {
+            let m = MemchrNImpl::new(needles);
+            for len in [64, 65, 127, 128, 129] {
+                let mut haystack = vec![b'x'; len];
+                assert_eq!(m.first(&haystack), None);
+                assert_eq!(m.iter(&haystack).next(), None);
+                for &needle in needles {
+                    for pos in 0..len {
+                        haystack[pos] = needle;
+                        assert_eq!(m.first(&haystack), Some(pos));
+                        assert_eq!(m.iter(&haystack).collect::<Vec<_>>(), vec![pos]);
+                        haystack[pos] = b'x';
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_shufti_unrolled_loop_returns_earliest_match() {
+        let m = MemchrNImpl::new(b"abcdefgh");
+        for later in [16, 32, 48, 64, 80, 96, 112] {
+            let mut haystack = [b'x'; 128];
+            haystack[later] = b'h';
+            for earlier in 0..later {
+                haystack[earlier] = b'a';
+                assert_eq!(m.first(&haystack), Some(earlier));
+                assert_eq!(m.iter(&haystack).collect::<Vec<_>>(), vec![earlier, later]);
+                haystack[earlier] = b'x';
+            }
+        }
+    }
+
+    #[test]
     fn test_iterators() {
         let text = b"a b c d\te\nf  g";
 

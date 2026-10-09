@@ -53,6 +53,8 @@ impl Vector for __m128i {
 
     #[inline(always)]
     unsafe fn any_match(self) -> bool {
+        // movmask only observes each lane's high bit. Compare against zero
+        // first so matches stored in any of the eight bits are detected.
         _mm_movemask_epi8(_mm_cmpeq_epi8(self, _mm_setzero_si128())) != 0xFFFF
     }
 }
