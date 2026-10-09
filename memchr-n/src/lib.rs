@@ -170,6 +170,29 @@ mod tests {
     }
 
     #[test]
+    fn test_shufti_boundaries_with_binary_needles() {
+        let needles = [0, 0x11, 0x80, 0xff];
+        let m = MemchrNImpl::new(&needles);
+        for len in [0, 1, 15, 16, 17, 63, 64, 65, 127, 128, 129] {
+            for alignment in [0, 1, 15] {
+                let mut buffer = vec![0x55; alignment + len];
+                let haystack = &mut buffer[alignment..];
+                // Zero padding in a short final chunk must not count as a match.
+                assert_eq!(m.first(haystack), None);
+                assert_eq!(m.iter(haystack).next(), None);
+                for &needle in &needles {
+                    for pos in 0..len {
+                        haystack[pos] = needle;
+                        assert_eq!(m.first(haystack), Some(pos));
+                        assert_eq!(m.iter(haystack).collect::<Vec<_>>(), vec![pos]);
+                        haystack[pos] = 0x55;
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_iterators() {
         let text = b"a b c d\te\nf  g";
 

@@ -55,11 +55,15 @@ impl MemchrNTable {
 
     /// Search `haystack` for the first byte that belongs to the set.
     ///
-    /// Processes the input in 64-byte chunks using unrolled SIMD path,
-    /// then handles the remaining bytes in 16-byte chunks and finally scalar fallback.
+    /// Uses an unrolled 64-byte loop when SIMD is enabled, then 16-byte chunks
+    /// and a padded final chunk. Without SIMD, chunks use scalar table lookups.
     pub fn first(&self, haystack: &[u8]) -> Option<usize> {
         let mut offset = 0usize;
 
+        #[cfg(any(
+            all(target_feature = "ssse3", target_arch = "x86_64"),
+            all(target_feature = "neon", target_arch = "aarch64")
+        ))]
         unsafe {
             use crate::arch::Vector;
             let l_tab = crate::arch::Vector::load(self.low_tab.as_ptr());
@@ -87,7 +91,8 @@ impl MemchrNTable {
                             return Some(
                                 offset
                                     + (res0.cmpne(crate::arch::Vector::splat(0)).movmask() as u32)
-                                        .trailing_zeros() as usize,
+                                        .trailing_zeros()
+                                        as usize,
                             );
                         }
                         return Some(
@@ -102,7 +107,8 @@ impl MemchrNTable {
                                 offset
                                     + 32
                                     + (res2.cmpne(crate::arch::Vector::splat(0)).movmask() as u32)
-                                        .trailing_zeros() as usize,
+                                        .trailing_zeros()
+                                        as usize,
                             );
                         }
                         return Some(
@@ -115,16 +121,17 @@ impl MemchrNTable {
                 }
                 offset += 64;
             }
+        }
 
-            // --- 16-byte loop ---
-            while offset + 16 <= haystack.len() {
-                let chunk: &[u8; 16] = &*(haystack.as_ptr().add(offset) as *const [u8; 16]);
-                let mask = self.bitmask_16b(chunk) as u32;
-                if mask != 0 {
-                    return Some(offset + mask.trailing_zeros() as usize);
-                }
-                offset += 16;
+        // Both SIMD and scalar backends provide this 16-byte interface.
+        while offset + 16 <= haystack.len() {
+            // SAFETY: The loop condition guarantees 16 bytes remain in the slice.
+            let chunk: &[u8; 16] = unsafe { &*(haystack.as_ptr().add(offset) as *const [u8; 16]) };
+            let mask = self.bitmask_16b(chunk) as u32;
+            if mask != 0 {
+                return Some(offset + mask.trailing_zeros() as usize);
             }
+            offset += 16;
         }
 
         // --- Scalar epilogue ---

@@ -1,7 +1,13 @@
-pub mod vector;
-pub use vector::Vector;
-
-mod generic;
+cfg_if::cfg_if! {
+    if #[cfg(any(
+        all(target_feature = "ssse3", target_arch = "x86_64"),
+        all(target_feature = "neon", target_arch = "aarch64")
+    ))] {
+        pub mod vector;
+        pub use vector::Vector;
+        mod generic;
+    }
+}
 
 cfg_if::cfg_if! {
     if #[cfg(all(target_feature="ssse3", target_arch="x86_64"))] {
