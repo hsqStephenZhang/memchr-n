@@ -69,28 +69,9 @@ fn impl_memchr_n(input: &DeriveInput) -> syn::Result<TokenStream2> {
         });
     }
 
-    // Check uniqueness
-    for i in 0..needles.len() {
-        for j in (i + 1)..needles.len() {
-            if needles[i] == needles[j] {
-                return Err(syn::Error::new_spanned(
-                    &input.ident,
-                    format!("shufti set contains duplicate byte 0x{:02x}", needles[i]),
-                ));
-            }
-        }
-    }
-
-    // Compute tables at compile time (same logic as build_shufti_fast)
-    let res = if needles.len() <= 8 {
-        Some(build_shufti_tables(&needles))
-    } else {
-        build_shufti_table_slow(&needles)
-    };
-
-    let Some((low_tab, high_tab, bit_mask)) = res else {
-        return Err(syn::Error::new_spanned(&input.ident, format!("failed to build shufti table")));
-    };
+    let memchrn_table::ShuftiTables { low_tab, high_tab, bit_mask } =
+        memchrn_table::build_tables(&needles)
+            .map_err(|error| syn::Error::new_spanned(&input.ident, error))?;
 
     let low_tab_tokens = low_tab.iter().map(|b| quote! { #b});
     let high_tab_tokens = high_tab.iter().map(|b| quote! { #b});
@@ -145,109 +126,40 @@ fn extract_set_attr(attrs: &[syn::Attribute]) -> syn::Result<String> {
     ))
 }
 
-// ---------------------------------------------------------------------------
-// Compile-time table construction (mirrors build_shufti_fast)
-// ---------------------------------------------------------------------------
-
-fn build_shufti_tables(needles: &[u8]) -> ([u8; 16], [u8; 16], u8) {
-    let mut low_tab = [0u8; 16];
-    let mut high_tab = [0u8; 16];
-
-    for (i, &byte) in needles.iter().enumerate() {
-        let bit = 1u8 << i;
-        low_tab[(byte & 0x0f) as usize] |= bit;
-        high_tab[(byte >> 4) as usize] |= bit;
-    }
-
-    let bit_mask = (1u32 << needles.len()).wrapping_sub(1) as u8;
-    (low_tab, high_tab, bit_mask)
-}
-
-fn build_shufti_table_slow(targets: &[u8]) -> Option<([u8; 16], [u8; 16], u8)> {
-    let mut low_tab = [0u8; 16];
-    let mut high_tab = [0u8; 16];
-    let mut current_bit = 0;
-    let mut assigned_mask = 0u8;
-
-    for &c in targets {
-        if current_bit >= 8 {
-            return None;
-        }
-
-        let hi = (c >> 4) as usize;
-        let lo = (c & 0x0F) as usize;
-
-        let mut placed = false;
-        for b in 0..current_bit {
-            if is_safe(b, c, targets, &low_tab, &high_tab) {
-                low_tab[lo] |= 1 << b;
-                high_tab[hi] |= 1 << b;
-                placed = true;
-                break;
-            }
-        }
-
-        if !placed && current_bit < 8 {
-            low_tab[lo] |= 1 << current_bit;
-            high_tab[hi] |= 1 << current_bit;
-            assigned_mask |= 1 << current_bit;
-            current_bit += 1;
-        }
-    }
-    Some((low_tab, high_tab, assigned_mask))
-}
-
-/// for a bit(bucket), suppose there are chars [s1, s2, s3]
-/// we have the low parts and high parts:
-///     [s1_low, s2_low, s3_low]
-///     [s1_high, s2_high, s3_high]
-/// we have to make sure: for any c = high<<4 + s1_low, c must belongs to this bucket
-/// in other words, if it's well-formed after adding candidate to the `bit_index`,
-/// then it's ok to do so.
-fn is_safe(
-    bit_index: u8,
-    candidate: u8,
-    targets: &[u8],
-    current_low: &[u8; 16],
-    current_high: &[u8; 16],
-) -> bool {
-    let c_hi = (candidate >> 4) as usize;
-    let c_lo = (candidate & 0x0F) as usize;
-    let bit = 1 << bit_index;
-
-    for other_hi in 0..16 {
-        for other_lo in 0..16 {
-            if (current_high[other_hi] & bit != 0) && (current_low[other_lo] & bit != 0) {
-                let ghost1 = ((c_hi << 4) | other_lo) as u8;
-                let ghost2 = ((other_hi << 4) | c_lo) as u8;
-
-                if !targets.contains(&ghost1) || !targets.contains(&ghost2) {
-                    return false;
-                }
-            }
-        }
-    }
-    true
-}
-
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
-    #[test]
-    fn test() {
-        let input = syn::parse2(quote! {
-            #[derive(MemchrNMatcher)]
-            #[memchrn(set = "abcd")]
-            pub struct MyMatcher;
-        })
-        .unwrap();
+    fn derive_set(set: &str) -> syn::Result<TokenStream2> {
+        let set = syn::LitStr::new(set, proc_macro2::Span::call_site());
+        let input = syn::parse_quote! {
+            #[memchrn(set = #set)]
+            struct Matcher;
+        };
+        impl_memchr_n(&input)
+    }
 
-        let ts = impl_memchr_n(&input).unwrap();
-        assert_eq!(
-            ts.to_string(),
-            r#"impl :: memchr_n :: MemchrNMatch for MyMatcher { # [inline (always)] fn memchr_n () -> impl :: memchr_n :: MemchrN { :: memchr_n :: MemchrNImpl :: MemchrN (unsafe { :: memchr_n :: MemchrNTable :: new_raw ([0u8 , 1u8 , 2u8 , 4u8 , 8u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , [0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 15u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8 , 0u8] , 15u8 ,) }) } }"#
+    #[test]
+    fn accepts_large_ascii_sets() {
+        let ascii: String = (0..=127u8).map(char::from).collect();
+        assert!(derive_set(&ascii).is_ok());
+        assert!(derive_set("0123456789").is_ok());
+        assert!(
+            derive_set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789").is_ok()
         );
+    }
+
+    #[test]
+    fn rejects_sets_with_more_than_eight_patterns() {
+        let error = derive_set("\x00\x11\x22\x33\x44\x55\x66\x77é").unwrap_err();
+        assert_eq!(error.to_string(), "too many shufti buckets (maximum 8)");
+    }
+
+    #[test]
+    fn rejects_empty_and_duplicate_table_inputs() {
+        assert_eq!(derive_set("").unwrap_err().to_string(), "shufti set must have >=1 bytes");
+        assert_eq!(derive_set("abcda").unwrap_err().to_string(), "needles must be unique");
+        // Preserve the existing memchr behavior for up to three needles.
+        assert!(derive_set("aa").is_ok());
     }
 }

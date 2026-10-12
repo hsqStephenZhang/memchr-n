@@ -9,6 +9,7 @@ description = "macro for memchr-n, a shufti table based string matcher"
 proc-macro = true
 
 [dependencies]
+memchrn-table = { path = "../memchrn-table", version = "0.1.0" }
 proc-macro2 = "1.0.106"
 quote = "1.0.44"
 syn = "2.0.117"

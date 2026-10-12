@@ -7,6 +7,7 @@ description = "shufti table based string matcher"
 
 [dependencies]
 cfg-if = "1.0.4"
+memchrn-table = { path = "../memchrn-table", version = "0.1.0" }
 memchrn-macro = { path = "../memchrn-macro", version = "0.1.0" }
 memchr = "2.8.0"
 

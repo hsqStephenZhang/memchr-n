@@ -409,6 +409,7 @@ dependencies = [
  "lazy_static",
  "memchr",
  "memchrn-macro",
+ "memchrn-table",
  "rand",
 ]
 
@@ -425,10 +426,15 @@ dependencies = [
 name = "memchrn-macro"
 version = "0.1.0"
 dependencies = [
+ "memchrn-table",
  "proc-macro2",
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "memchrn-table"
+version = "0.1.0"
 
 [[package]]
 name = "num-traits"

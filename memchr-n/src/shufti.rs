@@ -11,34 +11,16 @@ pub struct MemchrNTable {
 impl MemchrNTable {
     /// # Panics
     ///
-    /// This funtion panic if the needles are invalid, that is, |needles|>8 or it contains duplicated characters
+    /// Panics for empty or duplicate needles, or when more than eight distinct
+    /// non-empty low-nibble sets are needed.
     #[inline(always)]
     pub fn new(needles: &[u8]) -> Self {
         Self::try_new(needles).unwrap()
     }
 
     pub fn try_new(needles: &[u8]) -> Result<Self, &str> {
-        if needles.is_empty() {
-            return Err("empty needles");
-        }
-        if needles.len() > 8 {
-            return Err("too many needles");
-        }
-
-        let mut low_tab = [0u8; 16];
-        let mut high_tab = [0u8; 16];
-
-        for (i, &b) in needles.iter().enumerate() {
-            if needles[..i].contains(&b) {
-                return Err("needles must be unique");
-            }
-
-            let bit = 1u8 << i;
-            low_tab[(b & 0x0f) as usize] |= bit;
-            high_tab[(b >> 4) as usize] |= bit;
-        }
-
-        Ok(Self { low_tab, high_tab, bit_mask: (1u32 << needles.len()).wrapping_sub(1) as u8 })
+        let tables = memchrn_table::build_tables(needles)?;
+        Ok(Self { low_tab: tables.low_tab, high_tab: tables.high_tab, bit_mask: tables.bit_mask })
     }
 
     /// # Safety: the low_tab and high_tab and bit_mask must be valid

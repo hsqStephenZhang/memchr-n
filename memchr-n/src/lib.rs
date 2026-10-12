@@ -26,7 +26,8 @@ pub enum MemchrNImpl {
 impl MemchrNImpl {
     /// # Panics
     ///
-    /// This Function panics if |needles|>3 and the needles contains duplicated character
+    /// Panics if the needles are empty or shufti table construction fails.
+    /// Sets of up to three bytes use memchr and allow duplicate needles.
     pub fn new(needles: &[u8]) -> Self {
         Self::try_new(needles).unwrap()
     }

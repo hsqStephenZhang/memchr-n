@@ -1,0 +1,6 @@
+[package]
+name = "memchrn-table"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Shared shufti table construction for memchr-n"
