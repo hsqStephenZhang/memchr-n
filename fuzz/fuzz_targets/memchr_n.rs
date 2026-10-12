@@ -9,7 +9,7 @@ fuzz_target!(|data: &[u8]| {
     }
 
     // Use a variable number of needles (between 4 and 8)
-    let num_needles = (data[0] as usize % 4) + 4;
+    let num_needles = (data[0] as usize % 5) + 4;
 
     if data.len() < num_needles + 1 {
         return;
@@ -18,7 +18,10 @@ fuzz_target!(|data: &[u8]| {
     let needles = &data[1..=num_needles];
     let haystack = &data[num_needles + 1..];
 
-    let searcher = MemchrNImpl::new(needles);
+    let Ok(searcher) = MemchrNImpl::try_new(needles) else {
+        // Duplicate needles are invalid input, not a matcher failure.
+        return;
+    };
 
     let standard_first = haystack.iter().position(|&b| needles.contains(&b));
     let custom_first = searcher.first(haystack);
