@@ -1,29 +1,33 @@
 # 性能测试
 
-## 测试数据
+## 测试数据与统计口径
 
-1. haystack. 16B * 1024 random generated string
-2. needled: size ∈ {1, 2, 3, 4, 6, 8}
+输入为 16 KiB 的确定性伪随机字节，needle 数量为 1、2、3、4、6、8。
+生成输入时先移除所有意外匹配，再按场景放入一个匹配字节。
 
-## 结果
+| 场景 | 首次匹配位置 | 报告指标 |
+| --- | --- | --- |
+| `no_match` | 无匹配，搜索完整输入 | 延迟及按 16 KiB 计算的吞吐量 |
+| `end_match` | 16383，搜索到最后一个字节 | 延迟及按 16 KiB 计算的吞吐量 |
+| `early_match` | 255 | 仅延迟 |
 
-| 测试用例 (Needle) | 算法 (Algorithm) | 平均耗时 (Time) | 平均吞吐量 (Throughput) |
-| ----------------- | ---------------- | --------------- | ----------------------- |
-| n1                | shufti           | 16.837 ns       | 906.29 GiB/s            |
-| n1                | naive            | 142.92 ns       | 106.76 GiB/s            |
-| n1                | memchr           | 6.2425 ns       | 2444.3 GiB/s            |
-| n2                | shufti           | 16.885 ns       | 903.67 GiB/s            |
-| n2                | naive            | 205.56 ns       | 74.232 GiB/s            |
-| n2                | memchr           | 7.1109 ns       | 2145.8 GiB/s            |
-| n3                | shufti           | 16.919 ns       | 901.90 GiB/s            |
-| n3                | naive            | 393.86 ns       | 38.741 GiB/s            |
-| n3                | memchr           | 9.9295 ns       | 1536.7 GiB/s            |
-| n4                | shufti           | 16.906 ns       | 902.55 GiB/s            |
-| n4                | naive            | 470.86 ns       | 32.406 GiB/s            |
-| n4                | memchr           | 364.09 ns       | 41.909 GiB/s            |
-| n6                | shufti           | 16.818 ns       | 907.28 GiB/s            |
-| n6                | naive            | 626.01 ns       | 24.375 GiB/s            |
-| n6                | memchr           | 518.75 ns       | 29.414 GiB/s            |
-| n8                | shufti           | 16.868 ns       | 904.58 GiB/s            |
-| n8                | naive            | 787.35 ns       | 19.380 GiB/s            |
-| n8                | memchr           | 920.37 ns       | 16.579 GiB/s            |
+比较 naive、memchr、memchr-n 和 aho-corasick 的首次匹配搜索。
+memchr 对多个 needle 分组搜索后取最小有效位置；计时前检查四种算法的结果一致。
+
+此前结果在位置 255 提前返回，却按完整 16 KiB 计算吞吐量，数值高估约 64 倍。
+旧结果表已移除，应使用修复后的场景重新测量，分别比较各场景的数据。
+
+## 运行
+
+```sh
+cargo bench -p memchr-n --bench find
+```
+
+快速校验所有场景和算法，不进行统计测量：
+
+```sh
+cargo bench -p memchr-n --bench find -- --test
+```
+
+Criterion 报告位于 `target/criterion`。保存结果时应记录 CPU、Rust 版本及编译参数；
+仓库默认使用 `-C target-cpu=native`。
